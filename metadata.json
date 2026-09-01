@@ -1,0 +1,6 @@
+{
+  "name": "Hisab App",
+  "description": "Hisab App - Mobile-first invoice auto-capture, customer khata, POS sales billing, and GST analytics for Indian shopkeepers.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
