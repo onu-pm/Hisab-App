@@ -31,7 +31,8 @@ import {
   Building2,
   Settings,
   Layers,
-  ArrowRight
+  ArrowRight,
+  User
 } from 'lucide-react';
 import {
   Invoice,
@@ -45,6 +46,7 @@ import {
   CustomerPayment,
   SalesInvoice,
   GstSettings,
+  UserProfile,
 } from './types';
 import { getTranslation, SUPPORTED_LANGUAGES } from './locales/i18n';
 import { INITIAL_SHOP, INITIAL_INVOICES, INITIAL_VENDORS } from './data/sampleInvoices';
@@ -75,6 +77,7 @@ import { GstStatewiseSettingsView } from './components/GstStatewiseSettingsView'
 import { CreateSalesInvoiceModal } from './components/CreateSalesInvoiceModal';
 import { AddNewShopModal } from './components/AddNewShopModal';
 import { OnboardingFlow } from './components/OnboardingFlow';
+import { ProfileAndSettingsView } from './components/ProfileAndSettingsView';
 import { DEMO_SHOPS } from './data/sampleShops';
 
 export default function App() {
@@ -96,6 +99,16 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const stored = localStorage.getItem('hisab_is_authenticated');
     return stored !== 'false';
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('hisab_user_profile');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return null;
   });
 
   const [activeTab, setActiveTab] = useState<
@@ -164,7 +177,11 @@ export default function App() {
   // Fetch initial ledger data
   const fetchAllData = async () => {
     try {
-      const [invRes, sumRes, venRes, custRes, salesRes, gstRes, shopsRes] = await Promise.all([
+      const authToken = localStorage.getItem('hisab_auth_token');
+      const authHeaders: Record<string, string> = {};
+      if (authToken) authHeaders['Authorization'] = `Bearer ${authToken}`;
+
+      const [invRes, sumRes, venRes, custRes, salesRes, gstRes, shopsRes, profileRes] = await Promise.all([
         fetch('/api/invoices'),
         fetch('/api/ledger/summary'),
         fetch('/api/vendors'),
@@ -172,7 +189,23 @@ export default function App() {
         fetch('/api/sales'),
         fetch('/api/gst/settings'),
         fetch('/api/shops'),
+        fetch('/api/user/profile', { headers: authHeaders }),
       ]);
+
+      if (profileRes.ok) {
+        const profData = await profileRes.json();
+        if (profData.success && profData.user) {
+          setCurrentUser(profData.user);
+          localStorage.setItem('hisab_user_profile', JSON.stringify(profData.user));
+          if (profData.user.shops && profData.user.shops.length > 0) {
+            setAllShops(profData.user.shops);
+            localStorage.setItem('hisab_user_shops', JSON.stringify(profData.user.shops));
+          }
+          if (profData.active_shop) {
+            setShop(profData.active_shop);
+          }
+        }
+      }
 
       if (invRes.ok) {
         const invData = await invRes.json();
@@ -538,14 +571,26 @@ export default function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.setItem('hisab_is_authenticated', 'false');
+    localStorage.removeItem('hisab_auth_token');
+    localStorage.removeItem('hisab_user_id');
+    localStorage.removeItem('hisab_user_profile');
+    setCurrentUser(null);
     setIsAuthOpen(false);
   };
 
-  const handleLoginSuccess = (newShop: Shop) => {
+  const handleLoginSuccess = (newShop: Shop, newUser?: UserProfile) => {
     setShop(newShop);
     localStorage.setItem('hisab_active_shop_id', newShop.id);
     setIsAuthenticated(true);
     localStorage.setItem('hisab_is_authenticated', 'true');
+    if (newUser) {
+      setCurrentUser(newUser);
+      localStorage.setItem('hisab_user_profile', JSON.stringify(newUser));
+      if (newUser.shops && newUser.shops.length > 0) {
+        setAllShops(newUser.shops);
+        localStorage.setItem('hisab_user_shops', JSON.stringify(newUser.shops));
+      }
+    }
     setIsAuthOpen(false);
 
     // Sync GST settings with shop compliance
@@ -597,26 +642,26 @@ export default function App() {
       <main className="w-full sm:max-w-3xl md:max-w-4xl lg:max-w-5xl bg-white sm:border sm:border-slate-200 sm:rounded-3xl sm:shadow-xl flex flex-col min-h-screen sm:min-h-[90vh] overflow-hidden">
         
         {/* Top App Header with Shop Switcher, Language & Actions */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 shadow-2xs">
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-1.5 sm:gap-2 shadow-2xs">
           
           {/* Shop Switcher Dropdown Trigger */}
           <div className="relative min-w-0" ref={dropdownRef}>
             <button
               onClick={() => setIsShopDropdownOpen(!isShopDropdownOpen)}
-              className="flex items-center gap-2.5 p-1.5 -ml-1.5 rounded-2xl hover:bg-slate-100 transition cursor-pointer text-left group"
+              className="flex items-center gap-2 p-1 -ml-1 rounded-2xl hover:bg-slate-100 transition cursor-pointer text-left group"
               title="Switch Business / Shop"
             >
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-sm sm:text-base shadow-xs shrink-0 group-hover:scale-102 transition">
-                <Store className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xs sm:text-base shadow-xs shrink-0 group-hover:scale-102 transition">
+                <Store className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div className="min-w-0 pr-1">
-                <div className="flex items-center gap-1.5">
-                  <h1 className="font-bold text-slate-900 text-xs sm:text-sm truncate leading-tight max-w-[130px] sm:max-w-[200px] md:max-w-xs">
+              <div className="min-w-0 pr-0.5">
+                <div className="flex items-center gap-1">
+                  <h1 className="font-bold text-slate-900 text-xs sm:text-sm truncate leading-tight max-w-[120px] xs:max-w-[150px] sm:max-w-[200px] md:max-w-xs">
                     {shop.name.split('(')[0]}
                   </h1>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3 h-3 text-slate-500 shrink-0 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} />
                 </div>
-                <p className="text-[10px] text-slate-500 truncate max-w-[130px] sm:max-w-[200px]">
+                <p className="text-[10px] text-slate-500 truncate max-w-[120px] xs:max-w-[150px] sm:max-w-[200px]">
                   {shop.city || 'India'} • {shop.gst_number || shop.compliance?.gstin ? 'GST' : 'Exempt'}
                 </p>
               </div>
@@ -691,7 +736,7 @@ export default function App() {
           </div>
 
           {/* Right Header Actions: Connectivity, Language & New POS Sale */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Online / Offline Connectivity Pill */}
             <button
               id="offline-toggle-pill"
@@ -702,19 +747,19 @@ export default function App() {
                   handleSyncOfflineInvoices();
                 }
               }}
-              className={`px-2 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+              className={`p-1.5 sm:px-2 sm:py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
                 isOnline
                   ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
                   : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
               }`}
-              title="Toggle Online/Offline Mode"
+              title={isOnline ? 'Online (Tap to toggle)' : 'Offline (Tap to reconnect)'}
             >
-              {isOnline ? <Wifi className="w-3 h-3 text-emerald-600 shrink-0" /> : <WifiOff className="w-3 h-3 text-amber-600 shrink-0" />}
-              <span className="hidden xs:inline">{isOnline ? t.online : t.offline}</span>
+              {isOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> : <WifiOff className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+              <span className="hidden sm:inline">{isOnline ? t.online : t.offline}</span>
             </button>
 
             {/* Persistent Indian Language Selector */}
-            <div className="flex items-center bg-slate-50 hover:bg-slate-100 rounded-xl px-2 py-1 border border-slate-200 transition">
+            <div className="flex items-center bg-slate-50 hover:bg-slate-100 rounded-xl px-1.5 sm:px-2 py-1 border border-slate-200 transition">
               <Globe className="w-3.5 h-3.5 text-slate-500 mr-1 shrink-0" />
               <select
                 id="app-top-lang-dropdown"
@@ -724,35 +769,42 @@ export default function App() {
               >
                 {SUPPORTED_LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>
-                    {l.nativeLabel} ({l.code.toUpperCase()})
+                    {l.code.toUpperCase()} ({l.nativeLabel})
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Quick POS Bill Button */}
+            {/* Quick POS Bill Button (Visible on Tablet/Desktop) */}
             {isAuthenticated && (
               <button
                 onClick={() => {
                   setSalesCustomerTarget(null);
                   setIsSalesModalOpen(true);
                 }}
-                className="bg-emerald-700 hover:bg-emerald-800 active:scale-98 text-white text-xs font-bold py-1.5 px-3 rounded-xl flex items-center gap-1 shadow-xs transition cursor-pointer"
+                className="hidden sm:flex bg-emerald-700 hover:bg-emerald-800 active:scale-98 text-white text-xs font-bold py-1.5 px-3 rounded-xl items-center gap-1 shadow-xs transition cursor-pointer"
               >
                 <Receipt className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{language === 'hi' ? '+ बिक्री बिल' : '+ New Sale'}</span>
-                <span className="md:hidden">+ बिल</span>
+                <span>{language === 'hi' ? '+ बिक्री बिल' : '+ New Sale'}</span>
               </button>
             )}
 
-            {/* Add Shop Top Quick Action */}
+            {/* Profile Avatar / Settings Quick Action */}
             <button
-              onClick={() => setIsAddShopModalOpen(true)}
-              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl border border-slate-200 transition cursor-pointer hidden sm:flex items-center gap-1 text-xs font-bold"
-              title="Add New Shop"
+              onClick={() => setActiveTab('settings')}
+              className={`p-1 rounded-xl transition cursor-pointer flex items-center gap-1 border ${
+                activeTab === 'settings'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+              }`}
+              title="Profile, Settings & Logout"
             >
-              <Plus className="w-3.5 h-3.5 text-slate-700" />
-              <span>{language === 'hi' ? 'नई दुकान' : 'Add Shop'}</span>
+              <div className="w-6 h-6 rounded-lg bg-slate-800 text-white flex items-center justify-center font-black text-xs">
+                {(currentUser?.name || shop.owner_name || 'U').charAt(0).toUpperCase()}
+              </div>
+              <span className="text-[11px] font-bold hidden md:inline pr-1">
+                {(currentUser?.name || shop.owner_name || 'User').split(' ')[0]}
+              </span>
             </button>
           </div>
         </header>
@@ -791,8 +843,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Top Navigation Bar for Core Hubs */}
-            <div className="bg-white px-3 sm:px-5 py-2 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto text-xs font-bold select-none no-scrollbar">
+            {/* Top Navigation Bar for Desktop Hubs */}
+            <div className="hidden md:flex bg-white px-5 py-2 border-b border-slate-200 items-center gap-1.5 overflow-x-auto text-xs font-bold select-none no-scrollbar">
               <button
                 onClick={() => setActiveTab('ledger')}
                 className={`px-3 py-1.5 rounded-xl shrink-0 transition cursor-pointer flex items-center gap-1.5 ${
@@ -855,7 +907,7 @@ export default function App() {
             </div>
 
             {/* Main Scrollable View Area */}
-            <div className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 pb-20 sm:pb-6">
+            <div className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 pb-28 md:pb-6">
               {/* TAB 1: PURCHASES / LEDGER DASHBOARD */}
               {activeTab === 'ledger' && (
                 <LedgerDashboard
@@ -1007,178 +1059,31 @@ export default function App() {
 
               {/* TAB 8: SHOP PROFILE & SETTINGS */}
               {activeTab === 'settings' && (
-                <div className="space-y-4">
-                  {/* Shop Details Card */}
-                  <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-xl shadow-xs">
-                          <Store className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="font-bold text-slate-900 text-base">{shop.name.split('(')[0]}</h3>
-                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">Active</span>
-                          </div>
-                          <p className="text-xs text-slate-500">{shop.owner_name} • {shop.phone}</p>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => setIsAddShopModalOpen(true)}
-                        className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>{language === 'hi' ? 'नई दुकान जोड़ें' : 'Add Shop'}</span>
-                      </button>
-                    </div>
-
-                    {/* DigiLocker e-KYC Verification Certificate Badge */}
-                    <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-2xl space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-blue-900 flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                          DigiLocker Identity Verified (Govt of India)
-                        </span>
-                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          e-KYC Active ✓
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div>
-                          <span className="text-slate-500 block">UID / Aadhaar:</span>
-                          <span className="font-mono font-bold text-slate-800">
-                            {shop.digilocker_data?.masked_uid || 'XXXX-XXXX-9821'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block">PAN Number:</span>
-                          <span className="font-mono font-bold text-slate-800">
-                            {shop.digilocker_data?.pan_number || 'ABCPG9821K'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2 pt-1 border-t border-slate-100 text-xs">
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                        <span className="text-slate-500 font-bold">Business Type</span>
-                        <span className="font-bold text-slate-900 capitalize">
-                          {shop.business_type === 'gst_registered'
-                            ? 'GST Registered Trader'
-                            : shop.business_type === 'freelancer'
-                            ? 'Freelancer (Exempt < ₹20L)'
-                            : shop.business_type === 'composition_dealer'
-                            ? 'Composition Scheme (1%)'
-                            : 'Small Kirana (< ₹40L exempt)'}
-                        </span>
-                      </div>
-
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                        <span className="text-slate-500 font-bold">{t.gstin}</span>
-                        <span className="font-mono font-bold text-emerald-700">
-                          {gstSettings.gstin || shop.gst_number || 'Exempt / Non-GST'}
-                        </span>
-                      </div>
-
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                        <span className="text-slate-500 font-bold">{t.channel3Address}</span>
-                        <span className="font-mono text-blue-700">{shop.inbound_email}</span>
-                      </div>
-
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                        <span className="text-slate-500 font-bold">Location</span>
-                        <span className="text-slate-800 font-medium">{shop.city}, {gstSettings.shop_state_name}</span>
-                      </div>
-                    </div>
-
-                    {/* All Registered Shops List */}
-                    <div className="pt-3 border-t border-slate-100 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <label className="font-bold text-slate-800 text-xs block">
-                          {language === 'hi' ? 'आपकी सभी दुकानें व व्यापार:' : 'Your Businesses & Shops:'}
-                        </label>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          {allShops.length} {language === 'hi' ? 'दर्ज' : 'Saved'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto">
-                        {allShops.map((dShop) => {
-                          const isCurrent = shop.id === dShop.id;
-                          return (
-                            <div
-                              key={dShop.id}
-                              className={`p-3 rounded-2xl border text-xs transition flex items-center justify-between ${
-                                isCurrent
-                                  ? 'bg-slate-900 text-white font-bold border-slate-900 shadow-xs'
-                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
-                              }`}
-                            >
-                              <div className="min-w-0 pr-2">
-                                <p className="font-bold truncate">{dShop.name.split('(')[0]}</p>
-                                <p className={`text-[10px] truncate ${isCurrent ? 'text-slate-300' : 'text-slate-500'}`}>
-                                  {dShop.city} • {dShop.category.split('(')[0]}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {isCurrent ? (
-                                  <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-bold">
-                                    Active
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={() => handleSelectShop(dShop)}
-                                    className="py-1 px-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg font-bold text-[10px] hover:bg-slate-200 transition cursor-pointer"
-                                  >
-                                    Switch
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Add Another Shop Card */}
-                      <button
-                        onClick={() => setIsAddShopModalOpen(true)}
-                        className="w-full py-3 border-2 border-dashed border-slate-300 hover:border-slate-800 rounded-2xl text-xs font-bold text-slate-700 hover:text-slate-900 transition flex items-center justify-center gap-2 cursor-pointer mt-2"
-                      >
-                        <Plus className="w-4 h-4 text-slate-700" />
-                        <span>{language === 'hi' ? '+ एक और नई दुकान या फर्म जोड़ें' : '+ Add Another Business / Shop'}</span>
-                      </button>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                      <button
-                        onClick={() => setIsAuthOpen(true)}
-                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-3 rounded-2xl transition border border-slate-200 cursor-pointer"
-                      >
-                        {language === 'hi' ? 'फोन OTP लॉगिन / प्रोफाइल' : 'Phone OTP Login / Profile'}
-                      </button>
-                      <button
-                        onClick={handleLogout}
-                        className="px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs py-3 rounded-2xl transition border border-rose-200 cursor-pointer"
-                      >
-                        {language === 'hi' ? 'लॉगआउट' : 'Log Out'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <ProfileAndSettingsView
+                  language={language}
+                  onLanguageChange={handleLanguageChange}
+                  shop={shop}
+                  allShops={allShops}
+                  gstSettings={gstSettings}
+                  user={currentUser}
+                  onSelectShop={handleSelectShop}
+                  onOpenAddNewShop={() => setIsAddShopModalOpen(true)}
+                  onLaunchOnboarding={() => setIsOnboardingFlowOpen(true)}
+                  onLogout={handleLogout}
+                  onOpenGstSettingsTab={() => setActiveTab('gstOptions')}
+                />
               )}
             </div>
 
             {/* Mobile Bottom Navigation Bar (Large 48px+ Tap Targets) */}
-            <nav className="fixed sm:sticky bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2 flex items-center justify-around select-none shadow-lg sm:shadow-none">
+            <nav className="fixed sm:sticky bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 sm:px-3 py-1.5 sm:py-2 flex items-center justify-around select-none shadow-lg sm:shadow-none">
               {/* 1. Purchases Ledger */}
               <button
                 id="nav-ledger-tab"
                 onClick={() => setActiveTab('ledger')}
-                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 py-1 px-2 rounded-xl transition cursor-pointer ${
+                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[46px] gap-0.5 py-1 px-2 rounded-2xl transition cursor-pointer ${
                   activeTab === 'ledger'
-                    ? 'text-slate-900 font-extrabold scale-105'
+                    ? 'text-slate-900 font-extrabold scale-105 bg-slate-100/80'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -1190,21 +1095,21 @@ export default function App() {
               <button
                 id="nav-customers-tab"
                 onClick={() => setActiveTab('customers')}
-                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 py-1 px-2 rounded-xl transition cursor-pointer ${
+                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[46px] gap-0.5 py-1 px-2 rounded-2xl transition cursor-pointer ${
                   activeTab === 'customers'
-                    ? 'text-slate-900 font-extrabold scale-105'
+                    ? 'text-slate-900 font-extrabold scale-105 bg-slate-100/80'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span className="text-[10px]">{language === 'hi' ? 'ग्राहक' : 'Customers'}</span>
+                <span className="text-[10px]">{language === 'hi' ? 'खाता' : 'Khata'}</span>
               </button>
 
               {/* 3. Add Bill (Center Hero Action) */}
               <button
                 id="nav-capture-tab"
                 onClick={() => setActiveTab('capture')}
-                className={`flex flex-col items-center justify-center min-w-[64px] min-h-[44px] gap-0.5 py-1 px-3 rounded-2xl transition cursor-pointer ${
+                className={`flex flex-col items-center justify-center min-w-[64px] min-h-[46px] gap-0.5 py-1 px-3 rounded-2xl transition cursor-pointer ${
                   activeTab === 'capture'
                     ? 'bg-slate-900 text-white font-bold shadow-md scale-105'
                     : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
@@ -1218,9 +1123,9 @@ export default function App() {
               <button
                 id="nav-financials-tab"
                 onClick={() => setActiveTab('financials')}
-                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 py-1 px-2 rounded-xl transition cursor-pointer ${
+                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[46px] gap-0.5 py-1 px-2 rounded-2xl transition cursor-pointer ${
                   activeTab === 'financials'
-                    ? 'text-slate-900 font-extrabold scale-105'
+                    ? 'text-slate-900 font-extrabold scale-105 bg-slate-100/80'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
@@ -1228,18 +1133,18 @@ export default function App() {
                 <span className="text-[10px]">{language === 'hi' ? 'मुनाफ़ा' : 'Profit'}</span>
               </button>
 
-              {/* 5. GST Settings & Options */}
+              {/* 5. Profile & Settings */}
               <button
-                id="nav-gst-tab"
-                onClick={() => setActiveTab('gstOptions')}
-                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 py-1 px-2 rounded-xl transition cursor-pointer ${
-                  activeTab === 'gstOptions'
-                    ? 'text-slate-900 font-extrabold scale-105'
+                id="nav-settings-tab"
+                onClick={() => setActiveTab('settings')}
+                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[46px] gap-0.5 py-1 px-2 rounded-2xl transition cursor-pointer ${
+                  activeTab === 'settings'
+                    ? 'text-slate-900 font-extrabold scale-105 bg-slate-100/80'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Percent className="w-4 h-4" />
-                <span className="text-[10px]">GST</span>
+                <Settings className="w-4 h-4" />
+                <span className="text-[10px]">{language === 'hi' ? 'दुकान' : 'Shop'}</span>
               </button>
             </nav>
           </>

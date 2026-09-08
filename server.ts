@@ -36,6 +36,50 @@ import {
 dotenv.config();
 
 // In-Memory Database Store (Simulating PostgreSQL with persistence during runtime)
+export interface BackendUser {
+  id: string;
+  phone: string;
+  email?: string;
+  name: string;
+  role: 'owner' | 'manager' | 'accountant';
+  active_shop_id: string;
+  shops: Shop[];
+  created_at: string;
+  last_login: string;
+  kyc_status: 'verified' | 'pending' | 'unverified';
+  digilocker_data?: any;
+}
+
+const TEST_USER_ID = 'user-thepomonu-test';
+const TEST_USER: BackendUser = {
+  id: TEST_USER_ID,
+  phone: '+91 9876543210',
+  email: 'thepomonu@gmail.com',
+  name: 'Ramesh Kumar Gupta (Verified Merchant)',
+  role: 'owner',
+  active_shop_id: INITIAL_SHOP.id,
+  shops: [...DEMO_SHOPS],
+  created_at: new Date().toISOString(),
+  last_login: new Date().toISOString(),
+  kyc_status: 'verified',
+  digilocker_data: {
+    is_verified: true,
+    doc_type: 'aadhaar',
+    full_name: 'Ramesh Kumar Gupta',
+    masked_uid: 'XXXX-XXXX-9821',
+    pan_number: 'ABCPG9821K',
+    dob: '1988-08-15',
+    gender: 'MALE',
+    address: 'Civil Lines, Kanpur, Uttar Pradesh - 208001',
+    verified_at: new Date().toISOString(),
+    digilocker_txn_id: 'DL-GOV-IN-98218844',
+    issuer: 'Unique Identification Authority of India (UIDAI)',
+  },
+};
+
+let usersDb: BackendUser[] = [TEST_USER];
+let currentUserId = TEST_USER_ID;
+
 let shopData: Shop = { ...INITIAL_SHOP };
 let invoicesDb: Invoice[] = [...INITIAL_INVOICES];
 let vendorsDb: Vendor[] = [...INITIAL_VENDORS];
@@ -107,12 +151,65 @@ async function startServer() {
     res.json({ success: true, shops: DEMO_SHOPS, currentShopId: shopData.id });
   });
 
+  // Dedicated Test Login Flow for testing user details
+  app.post('/api/auth/test-login', (req, res) => {
+    let testUser = usersDb.find((u) => u.id === TEST_USER_ID || u.email === 'thepomonu@gmail.com');
+    if (!testUser) {
+      testUser = { ...TEST_USER };
+      usersDb.push(testUser);
+    }
+    testUser.last_login = new Date().toISOString();
+    currentUserId = testUser.id;
+
+    const activeShop = testUser.shops.find((s) => s.id === testUser.active_shop_id) || testUser.shops[0] || shopData;
+    shopData = { ...activeShop };
+
+    res.json({
+      success: true,
+      message: 'Test login successful',
+      token: `token_${testUser.id}_${Date.now()}`,
+      user: testUser,
+      shop: shopData,
+      allShops: testUser.shops,
+    });
+  });
+
+  // Get current user profile and linked businesses
+  app.get('/api/user/profile', (req, res) => {
+    const user = usersDb.find((u) => u.id === currentUserId) || usersDb[0] || TEST_USER;
+    res.json({
+      success: true,
+      user,
+      shop: shopData,
+      allShops: user.shops || [shopData],
+    });
+  });
+
+  // Update current user profile in backend database
+  app.put('/api/user/profile', (req, res) => {
+    const user = usersDb.find((u) => u.id === currentUserId) || usersDb[0];
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const { name, email, phone, role } = req.body;
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
+    if (role) user.role = role;
+
+    res.json({
+      success: true,
+      message: 'User profile updated successfully',
+      user,
+    });
+  });
+
   app.post('/api/auth/send-otp', (req, res) => {
     const { phone } = req.body;
     if (!phone) {
       return res.status(400).json({ error: 'Phone number is required' });
     }
-    // Standard test dummy OTP 9821 for effortless testing
+    // Standard test OTP 9821 for effortless testing
     res.json({
       success: true,
       message: 'OTP sent to mobile number',
@@ -122,7 +219,7 @@ async function startServer() {
   });
 
   app.post('/api/auth/verify-otp', (req, res) => {
-    const { phone, otp, language, shopName, ownerName, city, state } = req.body;
+    const { phone, otp, language, shopName, ownerName, city, state, email } = req.body;
     if (!phone || !otp) {
       return res.status(400).json({ error: 'Phone and OTP are required' });
     }
@@ -158,9 +255,36 @@ async function startServer() {
       shopData.language_pref = language;
     }
 
+    // Find or register backend user in usersDb
+    let matchedUser = usersDb.find((u) => u.phone.includes(cleanPhone) || (email && u.email === email));
+    if (!matchedUser) {
+      matchedUser = {
+        id: `user-${cleanPhone}`,
+        phone: `+91 ${cleanPhone}`,
+        email: email || `${cleanPhone}@hisabapp.in`,
+        name: ownerName || shopData.owner_name || 'Business Owner',
+        role: 'owner',
+        active_shop_id: shopData.id,
+        shops: [shopData],
+        created_at: new Date().toISOString(),
+        last_login: new Date().toISOString(),
+        kyc_status: 'verified',
+      };
+      usersDb.push(matchedUser);
+    } else {
+      matchedUser.last_login = new Date().toISOString();
+      if (!matchedUser.shops.some((s) => s.id === shopData.id)) {
+        matchedUser.shops.push(shopData);
+      }
+      matchedUser.active_shop_id = shopData.id;
+    }
+    currentUserId = matchedUser.id;
+
     res.json({
       success: true,
       shop: shopData,
+      user: matchedUser,
+      allShops: matchedUser.shops,
       token: `shop_token_${Date.now()}`,
     });
   });
@@ -303,6 +427,20 @@ async function startServer() {
     };
 
     shopData = newShop;
+
+    // Link shop to current user in usersDb
+    const currentUser = usersDb.find((u) => u.id === currentUserId);
+    if (currentUser) {
+      const idx = currentUser.shops.findIndex((s) => s.id === newShop.id);
+      if (idx >= 0) {
+        currentUser.shops[idx] = newShop;
+      } else {
+        currentUser.shops.push(newShop);
+      }
+      currentUser.active_shop_id = newShop.id;
+      if (kyc_verified) currentUser.kyc_status = 'verified';
+      if (digilocker_data) currentUser.digilocker_data = digilocker_data;
+    }
 
     // Synchronize GST Settings state
     const stateParts = (newShop.state || '09 - Uttar Pradesh').split('-');

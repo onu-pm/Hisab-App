@@ -291,29 +291,29 @@ export const CustomersKhataView: React.FC<CustomersKhataViewProps> = ({
                 key={customer.id}
                 className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs hover:border-slate-300 transition space-y-3"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-slate-900 text-sm">{customer.name}</span>
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-extrabold text-slate-900 text-sm truncate">{customer.name}</span>
                       {customer.customer_type === 'wholesale' && (
-                        <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
-                          B2B / Wholesale
+                        <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded-full font-bold shrink-0">
+                          B2B
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <Phone className="w-3 h-3 text-slate-400" />
-                      <span>{customer.phone}</span>
-                      {customer.city && <span>• {customer.city}</span>}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate">
+                      <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="font-mono">{customer.phone}</span>
+                      {customer.city && <span className="truncate">• {customer.city}</span>}
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">
+                  <div className="text-right shrink-0 pl-2">
+                    <div className="text-[10px] text-slate-500 font-bold uppercase whitespace-nowrap">
                       {hasDue ? (language === 'hi' ? 'बाक़ी रकम' : 'Balance Due') : (language === 'hi' ? 'चुकता' : 'Settled')}
                     </div>
                     <div
-                      className={`text-base font-black ${
+                      className={`text-sm sm:text-base font-black whitespace-nowrap ${
                         hasDue ? 'text-rose-700' : 'text-emerald-700'
                       }`}
                     >

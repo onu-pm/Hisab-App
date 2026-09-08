@@ -257,8 +257,8 @@ export const LedgerDashboard: React.FC<LedgerDashboardProps> = ({
               }`}
             >
               {/* Card Top Row: Vendor & Amount */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="flex items-start gap-2.5 min-w-0 flex-1">
                   {/* Thumbnail */}
                   <div className="w-12 h-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 relative">
                     <img
@@ -272,24 +272,22 @@ export const LedgerDashboard: React.FC<LedgerDashboardProps> = ({
                   </div>
 
                   {/* Vendor Details */}
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-emerald-800 transition">
-                        {inv.vendor_name}
-                      </h4>
-                    </div>
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <h4 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-emerald-800 transition truncate">
+                      {inv.vendor_name}
+                    </h4>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <span className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate">
+                      <span className="flex items-center gap-1 shrink-0">
                         <Calendar className="w-3 h-3 text-slate-400" />
                         {inv.invoice_date}
                       </span>
                       <span>•</span>
-                      <span className="font-mono text-slate-700">{inv.invoice_number}</span>
+                      <span className="font-mono text-slate-700 truncate">{inv.invoice_number}</span>
                     </div>
 
                     {inv.gst_number && (
-                      <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      <span className="inline-block text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 truncate max-w-full">
                         GST: {inv.gst_number}
                       </span>
                     )}
@@ -297,12 +295,12 @@ export const LedgerDashboard: React.FC<LedgerDashboardProps> = ({
                 </div>
 
                 {/* Amount & ITC Pill */}
-                <div className="text-right space-y-1">
-                  <div className="text-base sm:text-lg font-extrabold text-emerald-800">
+                <div className="text-right space-y-1 shrink-0 pl-2">
+                  <div className="text-base sm:text-lg font-extrabold text-emerald-800 whitespace-nowrap">
                     ₹{inv.amount.toLocaleString('en-IN')}
                   </div>
                   {inv.gst_amount > 0 && (
-                    <div className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full inline-block">
+                    <div className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-full inline-block whitespace-nowrap">
                       +{inv.gst_amount.toFixed(0)} {t.inputGstCredit}
                     </div>
                   )}

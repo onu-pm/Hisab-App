@@ -124,6 +124,20 @@ export interface Shop {
   compliance?: IndianComplianceDetails;
 }
 
+export interface UserProfile {
+  id: string;
+  phone: string;
+  email?: string;
+  name: string;
+  role: 'owner' | 'manager' | 'accountant';
+  active_shop_id: string;
+  shops: Shop[];
+  created_at: string;
+  last_login: string;
+  kyc_status: 'verified' | 'pending' | 'unverified';
+  digilocker_data?: DigiLockerVerification;
+}
+
 export interface Vendor {
   id: string;
   shop_id: string;
