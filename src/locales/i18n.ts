@@ -142,6 +142,16 @@ export interface TranslationDictionary {
   shopDetails: string;
   changeLanguage: string;
   logout: string;
+  signIn: string;
+  signUp: string;
+  createAccount: string;
+  alreadyHaveAccount: string;
+  dontHaveAccount: string;
+  businessName: string;
+  ownerName: string;
+  emailAddress: string;
+  selectState: string;
+  businessType: string;
   
   // Quick Actions & Tooltips
   tapToScan: string;
@@ -398,6 +408,16 @@ export const translations: Record<string, TranslationDictionary> = {
     shopDetails: 'दुकान की जानकारी',
     changeLanguage: 'भाषा बदलें',
     logout: 'लॉग आउट',
+    signIn: 'साइन इन (Sign In)',
+    signUp: 'साइन अप / नया खाता (Sign Up)',
+    createAccount: 'नया खाता बनाएं',
+    alreadyHaveAccount: 'पहले से खाता है? साइन इन करें',
+    dontHaveAccount: 'नया खाता चाहिए? यहाँ साइन अप करें',
+    businessName: 'दुकान / फर्म का नाम',
+    ownerName: 'दुकानदार / मालिक का नाम',
+    emailAddress: 'ईमेल पता (वैकल्पिक)',
+    selectState: 'राज्य चुनें (State)',
+    businessType: 'व्यापार का प्रकार',
     
     tapToScan: 'बिल स्कैन करें',
     quickCapture: 'बिल जोड़ें +',
@@ -631,6 +651,16 @@ export const translations: Record<string, TranslationDictionary> = {
     shopDetails: 'Shop Profile',
     changeLanguage: 'Change Language',
     logout: 'Log Out',
+    signIn: 'Sign In',
+    signUp: 'Sign Up',
+    createAccount: 'Create Merchant Account',
+    alreadyHaveAccount: 'Already have an account? Sign In',
+    dontHaveAccount: "Don't have an account? Sign Up Free",
+    businessName: 'Business / Shop Name',
+    ownerName: 'Merchant / Owner Name',
+    emailAddress: 'Email Address (Optional)',
+    selectState: 'Select State / Region',
+    businessType: 'Business Scheme',
     
     tapToScan: 'Scan Bill',
     quickCapture: 'Add Bill +',

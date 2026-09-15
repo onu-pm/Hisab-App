@@ -289,6 +289,85 @@ async function startServer() {
     });
   });
 
+  // Dedicated Sign Up Endpoint for New Merchants
+  app.post('/api/auth/signup', (req, res) => {
+    const { name, phone, email, shopName, city, state, gstNumber, businessType, category, language } = req.body;
+    if (!name || !phone) {
+      return res.status(400).json({ error: 'Merchant name and mobile number are required' });
+    }
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length !== 10) {
+      return res.status(400).json({ error: 'Please enter a valid 10-digit Indian mobile number' });
+    }
+
+    const stateStr = state || '07 - Delhi';
+    const stateParts = stateStr.split('-');
+    const stateCode = stateParts[0]?.trim() || '07';
+    const stateName = stateParts[1]?.trim() || 'Delhi';
+
+    const newShopId = `shop-${cleanPhone}-${Date.now()}`;
+    const newShop: Shop = {
+      id: newShopId,
+      name: shopName || `${name}'s Enterprises`,
+      owner_name: name,
+      phone: `+91 ${cleanPhone}`,
+      language_pref: language || 'en',
+      gst_number: gstNumber || '',
+      city: city || 'New Delhi',
+      state: stateStr,
+      category: category || 'Retail & General Trading',
+      inbound_email: `shop-${cleanPhone}@ingestion.hisabapp.in`,
+      created_at: new Date().toISOString(),
+      business_type: businessType || (gstNumber ? 'gst_registered' : 'composite_scheme'),
+      kyc_verified: true,
+      compliance: {
+        has_gst: !!gstNumber,
+        gstin: gstNumber || '',
+        trade_name: shopName || `${name}'s Enterprises`,
+        tax_scheme: gstNumber ? 'regular' : 'composition',
+        turnover_bracket: 'below_20_lakhs',
+      },
+    };
+
+    const userId = `user-${cleanPhone}`;
+    let existingUser = usersDb.find((u) => u.id === userId || u.phone.includes(cleanPhone));
+    if (existingUser) {
+      existingUser.name = name;
+      if (email) existingUser.email = email;
+      if (!existingUser.shops.some((s) => s.id === newShop.id)) {
+        existingUser.shops.unshift(newShop);
+      }
+      existingUser.active_shop_id = newShop.id;
+      existingUser.last_login = new Date().toISOString();
+    } else {
+      existingUser = {
+        id: userId,
+        name,
+        phone: `+91 ${cleanPhone}`,
+        email: email || `${cleanPhone}@hisabapp.in`,
+        role: 'owner',
+        active_shop_id: newShop.id,
+        shops: [newShop],
+        created_at: new Date().toISOString(),
+        last_login: new Date().toISOString(),
+        kyc_status: 'verified',
+      };
+      usersDb.push(existingUser);
+    }
+
+    currentUserId = existingUser.id;
+    shopData = { ...newShop };
+
+    res.json({
+      success: true,
+      message: 'Account registered successfully',
+      token: `token_${existingUser.id}_${Date.now()}`,
+      user: existingUser,
+      shop: newShop,
+      allShops: existingUser.shops,
+    });
+  });
+
   // DigiLocker e-KYC Identity Verification
   app.post('/api/kyc/digilocker-verify', (req, res) => {
     const { phone, docType = 'aadhaar', uidOrPan = '', consent = true } = req.body;

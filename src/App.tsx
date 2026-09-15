@@ -98,7 +98,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const stored = localStorage.getItem('hisab_is_authenticated');
-    return stored !== 'false';
+    const token = localStorage.getItem('hisab_auth_token');
+    return stored === 'true' && !!token;
   });
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
@@ -641,8 +642,17 @@ export default function App() {
       {/* Main Container: Mobile Full-Width Responsive Canvas */}
       <main className="w-full sm:max-w-3xl md:max-w-4xl lg:max-w-5xl bg-white sm:border sm:border-slate-200 sm:rounded-3xl sm:shadow-xl flex flex-col min-h-screen sm:min-h-[90vh] overflow-hidden">
         
-        {/* Top App Header with Shop Switcher, Language & Actions */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-1.5 sm:gap-2 shadow-2xs">
+        {/* IF NOT AUTHENTICATED: SHOW PRIMARY SIGN IN / SIGN UP SCREEN BEFORE LANDING PAGE */}
+        {!isAuthenticated ? (
+          <LoginScreen
+            language={language}
+            onLanguageChange={handleLanguageChange}
+            onLoginSuccess={handleLoginSuccess}
+          />
+        ) : (
+          <>
+            {/* Top App Header with Shop Switcher, Language & Actions */}
+            <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-1.5 sm:gap-2 shadow-2xs">
           
           {/* Shop Switcher Dropdown Trigger */}
           <div className="relative min-w-0" ref={dropdownRef}>
@@ -807,17 +817,8 @@ export default function App() {
               </span>
             </button>
           </div>
-        </header>
+            </header>
 
-        {/* IF NOT AUTHENTICATED: SHOW PRIMARY LOGIN SCREEN */}
-        {!isAuthenticated ? (
-          <LoginScreen
-            language={language}
-            onLanguageChange={handleLanguageChange}
-            onLoginSuccess={handleLoginSuccess}
-          />
-        ) : (
-          <>
             {/* Offline Queue Sync Alert Banner */}
             {!isOnline && (
               <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-amber-900 text-xs flex items-center justify-between">
